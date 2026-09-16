@@ -2,45 +2,127 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --canvas: #e7f4f8;
+  --surface: rgba(255, 255, 255, 0.72);
+  --ink: #07324a;
+  --muted: #4f7384;
+  --line: rgba(12, 74, 96, 0.12);
+  --accent: #0f766e;
+  --glow: #22d3ee;
+  --coral: #f97373;
+  --navy: #0b3b4f;
+  --shadow-panel: 0 18px 50px rgba(12, 58, 78, 0.1);
+  --header: rgba(255, 255, 255, 0.7);
+}
+
+html.theme-dark {
+  --canvas: #041018;
+  --surface: rgba(8, 28, 42, 0.72);
+  --ink: #e7f6fb;
+  --muted: #8fb3c4;
+  --line: rgba(125, 211, 252, 0.14);
+  --accent: #2dd4bf;
+  --glow: #67e8f9;
+  --coral: #fb7185;
+  --navy: #082433;
+  --shadow-panel: 0 22px 60px rgba(0, 0, 0, 0.35);
+  --header: rgba(5, 22, 34, 0.72);
+}
+
 @layer base {
   * { @apply box-border; }
-  body { @apply m-0 min-h-screen font-sans antialiased; color: #183b55; background: #f4f7fa; }
+  html, body, #root { min-height: 100%; }
+  body {
+    @apply m-0 font-sans antialiased;
+    color: var(--ink);
+    background: var(--canvas);
+  }
+  h1, h2, h3 { font-family: Syne, Outfit, sans-serif; }
   button, input, select, textarea { font: inherit; }
+  ::selection { background: #22d3ee55; }
 }
 
 @layer components {
-  .panel { @apply rounded-xl border border-slate-200 bg-surface p-5 shadow-sm; }
-  .eyebrow { @apply mb-3 text-[11px] font-bold uppercase tracking-[.16em] text-slate-500; }
+  .panel {
+    @apply rounded-2xl border border-line p-5 shadow-panel backdrop-blur-xl;
+    background: var(--surface);
+  }
+  .eyebrow {
+    @apply mb-3 text-[11px] font-bold uppercase tracking-[.2em] text-muted;
+  }
   .field-label { @apply mb-1.5 block text-xs font-semibold text-muted; }
-  .field-input { @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-sm text-[#18383a] outline-none transition placeholder:text-[#9aadaa] focus:border-cyan focus:ring-2 focus:ring-cyan/10; }
-  .action { @apply inline-flex items-center justify-center rounded-lg bg-cyan px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-px hover:bg-[#0b625b] disabled:cursor-not-allowed disabled:opacity-50; }
-  .action-secondary { @apply inline-flex items-center justify-center rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-semibold text-[#24484a] transition hover:border-cyan hover:bg-[#f3f9f7]; }
+  .field-input {
+    @apply w-full rounded-xl border border-line bg-white/40 px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20;
+  }
+  .action {
+    @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-teal-500 to-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:-translate-y-px hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .action-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-line bg-white/20 px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-glow hover:bg-white/30;
+  }
+  .page-enter { animation: fadeUp .65s cubic-bezier(.22,1,.36,1) both; }
+  .page-enter-delay { animation: fadeUp .75s .08s cubic-bezier(.22,1,.36,1) both; }
+  .glass-nav {
+    background: linear-gradient(180deg, rgba(4, 28, 42, .92), rgba(3, 18, 28, .88));
+  }
 }
 
-/* High-contrast ocean palette activated by the water-droplet switch. */
-html.theme-dark body { background: #061c2c; color: #d7e7f1; }
-html.theme-dark ::selection { background: #176f93; color: #fff; }
-html.theme-dark .bg-\[\#f4f7fa\] { background-color: #061c2c !important; }
-html.theme-dark .bg-white, html.theme-dark .panel { background-color: #0d2a3d !important; }
-html.theme-dark .workspace-header { background: #0a2639 !important; border-color: #315b73 !important; box-shadow: 0 1px 0 rgba(132, 200, 229, .05); }
-html.theme-dark .workspace-header .text-slate-300 { color: #5f879b !important; }
-html.theme-dark .bg-slate-50, html.theme-dark .bg-\[\#f8fbfa\], html.theme-dark .bg-\[\#f4fafb\], html.theme-dark .bg-\[\#f6faf9\], html.theme-dark .bg-\[\#f2fafc\] { background-color: #12354a !important; }
-html.theme-dark .border-slate-200, html.theme-dark .border-slate-100, html.theme-dark .border-line, html.theme-dark .border-\[\#b9dce6\] { border-color: #315b73 !important; }
-html.theme-dark .text-slate-400, html.theme-dark .text-slate-500, html.theme-dark .text-slate-600, html.theme-dark .text-muted { color: #b6cfde !important; }
-html.theme-dark .text-\[\#073654\], html.theme-dark .text-\[\#18383a\], html.theme-dark .text-\[\#183b55\], html.theme-dark .text-\[\#24484a\], html.theme-dark .text-\[\#31506a\], html.theme-dark .text-\[\#668197\] { color: #f0f8fc !important; }
-html.theme-dark .text-\[\#075987\], html.theme-dark .text-\[\#126287\], html.theme-dark .text-\[\#086384\] { color: #72ccef !important; }
-html.theme-dark .field-label, html.theme-dark .eyebrow { color: #b6cfde !important; }
-html.theme-dark .field-input { background: #071f31; border-color: #48728a; color: #f4fbff; }
-html.theme-dark .field-input::placeholder { color: #83a2b5; }
-html.theme-dark select.field-input option { background: #0d2a3d; color: #f4fbff; }
-html.theme-dark .action-secondary { background: #12354a !important; color: #e7f5fb !important; border-color: #3d6a82 !important; }
-html.theme-dark .bg-sky-50, html.theme-dark .bg-\[\#eaf5f8\], html.theme-dark .bg-\[\#e6f4ef\], html.theme-dark .bg-\[\#edf7f3\] { background-color: #153d52 !important; }
-html.theme-dark .to-white { --tw-gradient-to: #0d2a3d var(--tw-gradient-to-position) !important; }
-html.theme-dark .from-sky-50 { --tw-gradient-from: #123b52 var(--tw-gradient-from-position) !important; }
-html.theme-dark .from-rose-50 { --tw-gradient-from: #432a38 var(--tw-gradient-from-position) !important; }
-html.theme-dark .from-amber-50 { --tw-gradient-from: #423722 var(--tw-gradient-from-position) !important; }
-html.theme-dark .recharts-text, html.theme-dark .recharts-legend-item-text { fill: #bfd5e2 !important; color: #bfd5e2 !important; }
-html.theme-dark .recharts-cartesian-grid line { stroke: #315b73 !important; }
+html.theme-dark .field-input { background: rgba(4, 20, 32, .7); color: #f4fbff; }
+html.theme-dark select.field-input option { background: #0d2a3d; }
 
-/* Page titles and their supporting copy stay distinct from dark card surfaces. */
-html.theme-dark h1.text-\[\#073654\], html.theme-dark h2.text-\[\#073654\] { color: #f5fbff !important; text-shadow: 0 1px 10px rgba(69, 167, 207, .08); }
+.ocean-stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ocean-aurora {
+  position: absolute;
+  width: 55vw;
+  height: 55vw;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: .45;
+  animation: drift 16s ease-in-out infinite;
+}
+
+.ocean-aurora.a { top: -12%; left: -8%; background: radial-gradient(circle, #22d3ee, transparent 70%); }
+.ocean-aurora.b { right: -10%; bottom: -18%; background: radial-gradient(circle, #14b8a6, transparent 68%); animation-delay: -6s; }
+.ocean-aurora.c { top: 35%; left: 40%; width: 30vw; height: 30vw; background: radial-gradient(circle, #6366f1, transparent 70%); animation-delay: -3s; opacity: .25; }
+
+.ocean-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 140px;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(34, 211, 238, .18), transparent 55%),
+    repeating-linear-gradient(90deg, transparent 0 40px, rgba(255,255,255,.04) 40px 80px);
+  mask-image: linear-gradient(to top, #000 20%, transparent);
+  animation: wave 18s linear infinite;
+}
+
+.bubble {
+  position: absolute;
+  bottom: -40px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.7), rgba(103, 232, 249, .15));
+  animation: bubble linear infinite;
+}
+
+.workspace-header {
+  background: var(--header);
+  backdrop-filter: blur(18px);
+}
+
+.chat-markdown p { margin: 0 0 .5rem; }
+.chat-markdown p:last-child { margin: 0; }
+.chat-markdown ul { margin: .25rem 0 .5rem 1rem; list-style: disc; }
+.chat-markdown strong { color: inherit; }
+
+.recharts-text, .recharts-legend-item-text { fill: var(--muted) !important; color: var(--muted) !important; }
+.recharts-cartesian-grid line { stroke: var(--line) !important; }

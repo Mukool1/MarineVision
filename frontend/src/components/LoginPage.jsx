@@ -2,9 +2,73 @@ import { useState } from 'react'
 import { login, register } from '../api/api'
 import Icon from './Icon'
 
+function OceanBackdrop() {
+  return (
+    <div className="ocean-stage" aria-hidden="true">
+      <div className="ocean-aurora a" />
+      <div className="ocean-aurora b" />
+      <div className="ocean-aurora c" />
+      <div className="ocean-waves" />
+    </div>
+  )
+}
+
 export default function LoginPage({ onAuthenticated }) {
-  const [mode, setMode] = useState('login'); const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [loading, setLoading] = useState(false)
-  const submit = async event => { event.preventDefault(); setError(''); setLoading(true); try { onAuthenticated(await (mode === 'login' ? login(email, password) : register(name, email, password))) } catch (err) { setError(err?.response?.data?.detail || 'Unable to authenticate. Please try again.') } finally { setLoading(false) } }
+  const [mode, setMode] = useState('login')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const signingIn = mode === 'login'
-  return <main className="min-h-screen bg-[#05364f] px-5 py-10 text-white"><div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-[1060px] items-center gap-12 lg:grid-cols-[1.05fr_.9fr]"><section className="max-w-[520px] lg:pl-8"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#126987] text-white shadow-lg shadow-black/10"><Icon name="droplet" className="h-7 w-7" /></span><p className="mb-0 mt-6 text-[11px] font-bold uppercase tracking-[.18em] text-sky-200">MarineVision platform</p><h1 className="mb-0 mt-4 max-w-md text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl">Underwater intelligence for safer surveys.</h1><p className="mb-0 mt-5 max-w-md text-sm leading-7 text-sky-100/75">Create your secure account to access scans, incident reports, analyst feedback, and monitoring preferences.</p><div className="mt-8 flex gap-6 text-[10px] font-bold uppercase tracking-[.12em] text-sky-200/70"><span>Secure access</span><span>Survey ready</span></div></section><section className="w-full rounded-2xl bg-white p-7 text-[#183b55] shadow-2xl shadow-black/25 sm:p-8"><p className="m-0 text-[10px] font-bold uppercase tracking-[.16em] text-[#2d82a3]">Secure access</p><h2 className="mb-0 mt-3 text-2xl font-extrabold tracking-tight text-[#073654]">{signingIn ? 'Sign in to MarineVision' : 'Create your account'}</h2><p className="mb-0 mt-1 text-xs leading-5 text-slate-500">{signingIn ? 'Your account keeps every survey and review connected.' : 'Set up your private operator profile in a few moments.'}</p><form onSubmit={submit} className="mt-6 space-y-4">{!signingIn && <label><span className="field-label">Full name</span><input required className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label>}<label><span className="field-label">Email</span><input required type="email" className="field-input" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label><label><span className="field-label">Password</span><input required minLength="8" type="password" className="field-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" /></label>{error && <p role="alert" className="m-0 rounded-lg bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}<button disabled={loading} className="action w-full bg-[#137c78] hover:bg-[#0d6764]" type="submit">{loading ? 'Please wait…' : signingIn ? 'Sign in' : 'Create account'}</button></form><div className="my-5 flex items-center gap-3 text-[9px] font-bold uppercase tracking-wide text-slate-400"><span className="h-px flex-1 bg-slate-200" />Secure operator access<span className="h-px flex-1 bg-slate-200" /></div><p className="mb-0 text-center text-xs text-slate-500">{signingIn ? "Don't have an account?" : 'Already have an account?'} <button onClick={() => { setMode(signingIn ? 'register' : 'login'); setError('') }} className="font-bold text-[#086384]">{signingIn ? 'Create one' : 'Sign in'}</button></p></section></div></main>
+
+  const submit = async event => {
+    event.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      onAuthenticated(await (signingIn ? login(email, password) : register(name, email, password)))
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Unable to authenticate. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-[#041018] px-5 py-10 text-white">
+      <OceanBackdrop />
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-5rem)] max-w-[1100px] items-center gap-12 lg:grid-cols-[1.05fr_.9fr]">
+        <section className="page-enter max-w-[540px] lg:pl-8">
+          <span className="grid h-14 w-14 animate-float place-items-center rounded-3xl border border-cyan-200/30 bg-cyan-400/10 text-cyan-200 shadow-glow">
+            <Icon name="droplet" className="h-7 w-7" />
+          </span>
+          <p className="mb-0 mt-7 text-[11px] font-bold uppercase tracking-[.22em] text-cyan-200/80">MarineVision platform</p>
+          <h1 className="mb-0 mt-4 max-w-lg font-display text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">See the ocean. Act before it breaks.</h1>
+          <p className="mb-0 mt-5 max-w-md text-sm leading-7 text-cyan-100/70">Secure sonar intelligence for debris, wreckage, and underwater hazards — with an AI assistant that turns detections into field-ready next steps.</p>
+          <div className="mt-10 flex gap-8 text-[10px] font-bold uppercase tracking-[.14em] text-cyan-200/60">
+            <span>Live sonar AI</span>
+            <span>Secure access</span>
+            <span>Cleanup ready</span>
+          </div>
+        </section>
+        <section className="page-enter-delay w-full rounded-3xl border border-cyan-200/15 bg-white/10 p-7 text-white shadow-2xl shadow-cyan-950/40 backdrop-blur-2xl sm:p-8">
+          <p className="m-0 text-[10px] font-bold uppercase tracking-[.18em] text-cyan-200/80">Secure access</p>
+          <h2 className="mb-0 mt-3 font-display text-2xl font-extrabold tracking-tight">{signingIn ? 'Sign in to MarineVision' : 'Create your account'}</h2>
+          <p className="mb-0 mt-2 text-xs leading-5 text-cyan-100/60">{signingIn ? 'Your account keeps every survey and review connected.' : 'Set up your private operator profile in a few moments.'}</p>
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            {!signingIn && <label><span className="field-label text-cyan-100/70">Full name</span><input required className="field-input border-cyan-200/15 bg-white/5 text-white" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" /></label>}
+            <label><span className="field-label text-cyan-100/70">Email</span><input required type="email" className="field-input border-cyan-200/15 bg-white/5 text-white" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
+            <label><span className="field-label text-cyan-100/70">Password</span><input required minLength="8" type="password" className="field-input border-cyan-200/15 bg-white/5 text-white" value={password} onChange={e => setPassword(e.target.value)} placeholder="Your password" /></label>
+            {error && <p role="alert" className="m-0 rounded-xl bg-rose-500/15 p-3 text-xs text-rose-200">{error}</p>}
+            <button disabled={loading} className="action w-full" type="submit">{loading ? 'Please wait…' : signingIn ? 'Enter the command deck' : 'Create account'}</button>
+          </form>
+          <p className="mb-0 mt-6 text-center text-xs text-cyan-100/60">
+            {signingIn ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button onClick={() => { setMode(signingIn ? 'register' : 'login'); setError('') }} className="font-bold text-cyan-200">{signingIn ? 'Create one' : 'Sign in'}</button>
+          </p>
+        </section>
+      </div>
+    </main>
+  )
 }

@@ -3,12 +3,8 @@ import { getScanFeedback, saveScanFeedback } from "../api/api";
 import Icon from "./Icon";
 
 const Stat = ({ value, label, alert }) => (
-  <div className="rounded-xl border border-line bg-[#f8fbfa] p-3">
-    <p
-      className={`m-0 text-xl font-bold ${alert ? "text-[#d14e4e]" : "text-cyan"}`}
-    >
-      {value}
-    </p>
+  <div className="rounded-2xl border border-line bg-cyan-400/5 p-3">
+    <p className={`m-0 font-display text-xl font-bold ${alert ? "text-coral" : "text-cyan"}`}>{value}</p>
     <p className="mb-0 mt-1 text-[11px] font-semibold text-muted">{label}</p>
   </div>
 );
@@ -41,13 +37,13 @@ export default function DetectionViewer({ result, onUpdated }) {
     return (
       <section className="panel flex min-h-[560px] flex-col">
         <p className="eyebrow">Scan result</p>
-        <h2 className="m-0 text-lg font-bold text-[#18383a]">Image review</h2>
+        <h2 className="m-0 font-display text-lg font-bold text-ink">Image review</h2>
         <div className="grid flex-1 place-items-center text-center">
           <div>
-            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-line bg-[#f1f8f6] text-lg font-black text-cyan">
+            <div className="mx-auto grid h-14 w-14 animate-float place-items-center rounded-2xl border border-line bg-cyan-400/10 text-lg font-black text-cyan">
               01
             </div>
-            <p className="mb-1 mt-4 font-semibold text-[#24484a]">
+            <p className="mb-1 mt-4 font-semibold text-ink">
               Results will appear here
             </p>
             <p className="m-0 text-sm text-muted">
@@ -124,9 +120,9 @@ export default function DetectionViewer({ result, onUpdated }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="eyebrow">Scan result</p>
-          <h2 className="m-0 text-lg font-bold text-[#18383a]">Image review</h2>
+          <h2 className="m-0 font-display text-lg font-bold text-ink">Image review</h2>
         </div>
-        <span className="rounded-full bg-[#e6f4ef] px-2.5 py-1 text-xs font-bold text-cyan">
+        <span className="rounded-full bg-cyan-400/15 px-2.5 py-1 text-xs font-bold text-cyan">
           Processed
         </span>
       </div>
@@ -135,7 +131,7 @@ export default function DetectionViewer({ result, onUpdated }) {
           <button
             key={key}
             onClick={() => setView(key)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${view === key ? "bg-[#173f42] text-white" : "text-muted hover:bg-[#f1f7f5]"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${view === key ? "bg-gradient-to-r from-teal-500 to-cyan-400 text-slate-950" : "text-muted hover:bg-cyan-400/10"}`}
           >
             {viewNames[key]}
           </button>
@@ -213,7 +209,7 @@ export default function DetectionViewer({ result, onUpdated }) {
           <p className="eyebrow mb-2">Detected targets</p>
           <button
             onClick={() => setFeedbackOpen((value) => !value)}
-            className="flex items-center gap-1 rounded-lg bg-[#eaf5f8] px-2.5 py-1.5 text-[10px] font-bold text-[#075987]"
+            className="flex items-center gap-1 rounded-lg bg-cyan-400/10 px-2.5 py-1.5 text-[10px] font-bold text-cyan"
           >
             <Icon name="settings" className="h-3.5 w-3.5" />
             {feedbackOpen ? "Close correction" : "Correct findings"}
@@ -227,11 +223,11 @@ export default function DetectionViewer({ result, onUpdated }) {
               return (
                 <div
                   key={detection.id}
-                  className={`rounded-xl border border-line bg-[#f8fbfa] px-3 py-2.5 ${item.status === "false_positive" ? "opacity-60" : ""}`}
+                  className={`rounded-xl border border-line bg-cyan-400/5 px-3 py-2.5 ${item.status === "false_positive" ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="m-0 text-sm font-semibold text-[#24484a]">
+                      <p className="m-0 text-sm font-semibold text-ink">
                         {item.label}
                       </p>
                       <p className="mb-0 mt-1 text-[11px] text-muted">
@@ -313,9 +309,9 @@ export default function DetectionViewer({ result, onUpdated }) {
         )}
       </div>
       {feedbackOpen && (
-        <div className="mt-4 rounded-xl border border-[#b9dce6] bg-[#f2fafc] p-4">
+        <div className="mt-4 rounded-xl border border-line bg-cyan-400/5 p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="m-0 text-xs font-bold text-[#075987]">
+            <p className="m-0 text-xs font-bold text-cyan">
               Analyst feedback loop
             </p>
             {saved && (

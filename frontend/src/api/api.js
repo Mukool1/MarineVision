@@ -43,3 +43,9 @@ export const deleteScan = (scanId) =>
   client.delete(`/api/history/${scanId}`).then(r => r.data)
 
 export const getStats = () => client.get('/api/stats').then(r => r.data)
+
+export const summarizeScanChat = (scan_data) =>
+  client.post('/api/chatbot/summarize', { scan_data }).then(r => r.data)
+
+export const queryScanChat = (scan_data, question, history = []) =>
+  client.post('/api/chatbot/query', { scan_data, question, history }).then(r => r.data)

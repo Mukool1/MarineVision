@@ -14,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from typing import Dict,Any,List,Optional
+from chatbot import generate_scan_summary, answer_user_question
 
 load_dotenv()
 import auth
@@ -38,6 +40,14 @@ class FeedbackRequest(BaseModel):
     note: str = Field(default="", max_length=2000)
 class ScanChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
+
+class SummaryRequest(BaseModel):
+    scan_data: Dict[str, Any]
+
+class ChatRequest(BaseModel):
+    scan_data: Dict[str, Any]
+    question: str
+    history: Optional[List[Dict[str, str]]] = None
 
 def user_view(user):
     return {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role, "created_at": user.created_at.isoformat()}
@@ -237,3 +247,17 @@ def reset_all(session: Session = Depends(db.get_db), _: db.User = Depends(auth.a
         session.delete(row)
     session.commit()
     return {"status": "reset complete"}
+
+@app.post("/api/chatbot/summarize")
+async def summarize_scan(request: SummaryRequest, _: db.User = Depends(auth.current_user)):
+    if not request.scan_data:
+        raise HTTPException(status_code=400, detail="Scan data is required")
+    summary = generate_scan_summary(request.scan_data)
+    return {"summary": summary}
+
+@app.post("/api/chatbot/query")
+async def chat_with_bot(request: ChatRequest, _: db.User = Depends(auth.current_user)):
+    if not request.question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    answer = answer_user_question(request.scan_data, request.question, request.history)
+    return {"response": answer}

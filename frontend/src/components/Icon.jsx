@@ -12,6 +12,8 @@ const paths = {
   check: <><circle cx="12" cy="12" r="9" /><path d="m8 12 2.6 2.6L16.5 9" /></>,
   signout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9" /></>,
   droplet: <><path d="M12 3.5s-6 6.1-6 10.6a6 6 0 0 0 12 0C18 9.6 12 3.5 12 3.5Z" /><path d="M9.2 15.1c.3 1.1 1.2 1.9 2.4 2.1" /></>,
+  chat: <><path d="M5 6h14v10H8l-3 3V6Z" /><path d="M8 10h8M8 13h5" /></>,
+  spark: <path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2" />,
 }
 
 export default function Icon({ name, className = 'h-4 w-4', strokeWidth = 1.8 }) {
