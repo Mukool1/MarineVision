@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _configured_model_path = os.getenv("MODEL_PATH", os.path.join("models", "best.pt"))
 MODEL_PATH = _configured_model_path if os.path.isabs(_configured_model_path) else os.path.join(BASE_DIR, _configured_model_path)
 MODEL_CONFIDENCE = float(os.getenv("MODEL_CONFIDENCE", "0.25"))
-MODEL_IMAGE_SIZE = int(os.getenv("MODEL_IMAGE_SIZE", "640"))
+MODEL_IMAGE_SIZE = int(os.getenv("MODEL_IMAGE_SIZE", "768"))
 
 _model = None
 _model_error = None
@@ -29,17 +29,29 @@ class ModelUnavailableError(RuntimeError):
     """Raised when the trained detector cannot be used for a scan."""
 
 
-# Legacy taxonomy retained for the optional offline heuristic helper below.
+# Taxonomy used by the optional offline heuristic helper below.
 CLASS_LABELS = [
-    "Debris - Metallic (Drum/Can)",
-    "Debris - Net/Rope (Fishing Gear)",
-    "Debris - Tyre/Rubber",
-    "Debris - Plastic/Container",
-    "Anomaly - Unidentified Object",
-    "Natural - Rock/Boulder",
-    "Natural - Seabed Ripple/Texture",
+    "Aircraft",
+    "Mine",
+    "Shipwreck",
+    "Pipeline",
+    "Fishing_Net",
 ]
 
+# Risk tiers for the trained YOLO taxonomy. Severity for real scans is driven
+# primarily by *which class* was detected (a Mine is never "low severity"),
+# refined by confidence. This replaces the old debris-keyword heuristic below,
+# which was written for a different label set ("Debris - Metallic (Drum/Can)"
+# etc.) and silently matched none of Aircraft/Mine/Shipwreck/Pipeline — those
+# four were being forced to "low" severity and excluded from debris counts
+# regardless of what was actually detected.
+HIGH_RISK_CLASSES = {"mine"}
+MEDIUM_RISK_CLASSES = {"aircraft", "shipwreck", "fishing net"}
+LOW_RISK_CLASSES = {"pipeline"}
+
+# Retained only for the legacy contour-based heuristic labels below
+# (e.g. "Debris - Metallic (Drum/Can)"), which don't map onto the risk tiers
+# above. Not used by the production YOLO path.
 DEBRIS_KEYWORDS = {"debris", "ghost", "gear", "crab", "net", "rope", "plastic", "can", "tyre"}
 
 
@@ -105,8 +117,36 @@ def _display_label(label: str) -> str:
 
 
 def _is_debris(label: str) -> bool:
-    words = set(_display_label(label).lower().split())
+    normalized = _display_label(label).lower()
+    if normalized in HIGH_RISK_CLASSES or normalized in MEDIUM_RISK_CLASSES:
+        return True
+    if normalized in LOW_RISK_CLASSES:
+        return False
+    # Fallback for legacy heuristic-pipeline labels that aren't part of the
+    # trained taxonomy above.
+    words = set(normalized.split())
     return bool(words & DEBRIS_KEYWORDS)
+
+
+def _severity_for_class(label: str, confidence: float) -> str:
+    """Severity for a trained-model detection. Class first, confidence second:
+    a Mine detected at moderate confidence still outranks a Pipeline detected
+    at high confidence."""
+    normalized = _display_label(label).lower()
+    if normalized in HIGH_RISK_CLASSES:
+        if confidence >= 0.5:
+            return "high"
+        if confidence >= 0.3:
+            return "medium"
+        return "low"
+    if normalized in MEDIUM_RISK_CLASSES:
+        if confidence >= 0.85:
+            return "high"
+        if confidence >= 0.6:
+            return "medium"
+        return "low"
+    # Pipeline, and anything outside the trained taxonomy.
+    return "medium" if confidence >= 0.9 else "low"
 
 
 def _empty_mask(shape: tuple) -> np.ndarray:
@@ -143,7 +183,7 @@ def _detect_with_yolo(image_bgr: np.ndarray) -> Tuple[List[Detection], np.ndarra
 
     for box in result.boxes:
         class_id = int(box.cls[0].item())
-        raw_label = names[class_id] if isinstance(names, dict) else names[class_id]
+        raw_label = names[class_id]
         label = _display_label(str(raw_label))
         confidence = round(float(box.conf[0].item()), 3)
         x1, y1, x2, y2 = box.xyxy[0].tolist()
@@ -153,7 +193,7 @@ def _detect_with_yolo(image_bgr: np.ndarray) -> Tuple[List[Detection], np.ndarra
         y2 = max(y1 + 1, min(image_h, int(round(y2))))
         width, height = x2 - x1, y2 - y1
         is_debris = _is_debris(label)
-        severity = _severity(confidence, is_debris)
+        severity = _severity_for_class(label, confidence)
 
         detections.append(Detection(
             id=str(uuid.uuid4())[:8],
@@ -249,7 +289,9 @@ def _classify_contour(cnt, gray_shape) -> Tuple[str, float, bool]:
     return "Anomaly - Unidentified Object", min(0.75, base_conf), True
 
 
-def _severity(confidence: float, is_debris: bool) -> str:
+def _severity_heuristic(confidence: float, is_debris: bool) -> str:
+    """Severity for the legacy contour-based heuristic pipeline only — it has
+    no class identity to key off, just a confidence score and a debris flag."""
     if not is_debris:
         return "low"
     if confidence >= 0.85:
@@ -289,7 +331,7 @@ def detect_objects_heuristic(image_bgr: np.ndarray,
             continue
         label, confidence, is_debris = _classify_contour(cnt, (h, w))
         x, y, bw, bh = cv2.boundingRect(cnt)
-        severity = _severity(confidence, is_debris)
+        severity = _severity_heuristic(confidence, is_debris)
 
         det = Detection(
             id=str(uuid.uuid4())[:8],
