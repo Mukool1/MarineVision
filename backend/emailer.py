@@ -13,11 +13,14 @@ class BrevoError(RuntimeError):
 
 
 def send_email(to_email, subject, html, text=None):
-    """Send one email via Brevo
-    api_key = os.getenv("BREVO_API_KEY")"""
+    """Send one email via Brevo"""
+    # Move this line out of the docstring comment above ⬇️
+    api_key = os.getenv("BREVO_API_KEY")
     sender = os.getenv("BREVO_SENDER_EMAIL")
+    
     if not api_key or not sender:
         raise RuntimeError("BREVO_API_KEY and BREVO_SENDER_EMAIL must be set in the backend environment")
+        
     payload = {
         "sender": {"email": sender, "name": os.getenv("BREVO_SENDER_NAME", "MarineVision")},
         "to": [{"email": to_email}],
@@ -34,11 +37,8 @@ def send_email(to_email, subject, html, text=None):
         with urllib.request.urlopen(request, timeout=15) as response:
             return json.loads(response.read().decode())
     except urllib.error.HTTPError as exc:
-        # Brevo explains itself in the response body — surface it instead of
-        # the bare "HTTP Error 400".
         body = exc.read().decode(errors="replace")
         raise BrevoError(f"Brevo rejected the request (HTTP {exc.code}): {body}") from exc
-
 
 def send_password_reset(to_email, full_name, reset_link):
     """Branded password-reset email. Link expires 30 minutes after it is issued."""
