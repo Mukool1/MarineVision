@@ -1,9 +1,11 @@
 """MarineVision API: PostgreSQL records, Cloudinary images, JWT user roles."""
+import hashlib
 import json
 import os
+import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import cv2
 import numpy as np
@@ -16,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from typing import Dict,Any,List,Optional
 from chatbot import generate_scan_summary, answer_user_question
+from emailer import send_password_reset
 
 load_dotenv()
 import auth
@@ -35,6 +38,11 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
 class FeedbackRequest(BaseModel):
     corrections: list[dict]
     note: str = Field(default="", max_length=2000)
@@ -52,7 +60,7 @@ class ChatRequest(BaseModel):
 def user_view(user):
     return {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role, "created_at": user.created_at.isoformat()}
 def scan_view(row, detail=False):
-    data = {"scan_id": row.id, "filename": row.filename, "timestamp": row.created_at.timestamp(), "location": row.location, "depth_m": row.depth_m, "annotated_image_url": row.annotated_url, "summary": json.loads(row.summary_json)}
+    data = {"scan_id": row.id, "filename": row.filename, "timestamp": row.created_at.timestamp(), "location": row.location, "depth_m": row.depth_m, "latitude": row.latitude, "longitude": row.longitude, "annotated_image_url": row.annotated_url, "summary": json.loads(row.summary_json)}
     if detail: data.update({"original_image_url": row.original_url, "mask_image_url": row.mask_url, "detections": json.loads(row.detections_json)})
     return data
 def can_access(row, user): return user.role == "admin" or row.owner_id == user.id
@@ -121,9 +129,56 @@ def login(payload: LoginRequest, session: Session = Depends(db.get_db)):
 @app.get("/api/auth/me")
 def me(user: db.User = Depends(auth.current_user)): return user_view(user)
 
+RESET_TOKEN_TTL_MINUTES = 30
+
+def _hash_token(token): return hashlib.sha256(token.encode()).hexdigest()
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, session: Session = Depends(db.get_db)):
+    """Issue a single-use reset token and email it. Always returns ok so that
+    nobody can probe which emails have accounts."""
+    user = session.scalar(select(db.User).where(db.User.email == payload.email.lower()))
+    if user:
+        token = secrets.token_urlsafe(32)
+        session.add(db.PasswordReset(
+            user_id=user.id,
+            token_hash=_hash_token(token),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_TTL_MINUTES),
+        ))
+        session.commit()
+        reset_link = f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/#reset?token={token}"
+        try:
+            send_password_reset(user.email, user.full_name, reset_link)
+        except Exception as exc:
+            # Token is already stored; surface the mail failure only in the logs
+            # so the endpoint still doesn't leak account existence.
+            print(f"[forgot-password] email failed for user {user.id}: {exc}")
+    return {"status": "ok"}
+
+@app.post("/api/auth/reset-password")
+def reset_password(payload: ResetPasswordRequest, session: Session = Depends(db.get_db)):
+    """Exchange a valid reset token for a new password. Tokens are single-use."""
+    record = session.scalar(
+        select(db.PasswordReset).where(db.PasswordReset.token_hash == _hash_token(payload.token))
+    )
+    now = datetime.now(timezone.utc)
+    if not record or record.expires_at.replace(tzinfo=timezone.utc) < now:
+        raise HTTPException(400, "This reset link is invalid or has expired. Request a new one.")
+    user = session.get(db.User, record.user_id)
+    if not user:
+        raise HTTPException(400, "This reset link is invalid or has expired. Request a new one.")
+    user.password_hash = auth.hash_password(payload.password)
+    # Invalidate every outstanding token for this user once the password changes.
+    for stale in session.scalars(select(db.PasswordReset).where(db.PasswordReset.user_id == user.id)):
+        session.delete(stale)
+    session.commit()
+    return {"status": "ok"}
+
 @app.post("/api/scan")
-async def scan_image(file: UploadFile = File(...), location: str = Form("Unknown"), depth_m: float = Form(0.0), session: Session = Depends(db.get_db), user: db.User = Depends(auth.current_user)):
+async def scan_image(file: UploadFile = File(...), location: str = Form("Unknown"), depth_m: float = Form(0.0), latitude: float | None = Form(None), longitude: float | None = Form(None), session: Session = Depends(db.get_db), user: db.User = Depends(auth.current_user)):
     if not (file.filename or "").lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")): raise HTTPException(400, "Unsupported image type")
+    if latitude is not None and not -90 <= latitude <= 90: raise HTTPException(400, "Latitude must be between -90 and 90")
+    if longitude is not None and not -180 <= longitude <= 180: raise HTTPException(400, "Longitude must be between -180 and 180")
     raw_bytes = await file.read()
     if len(raw_bytes) > 15 * 1024 * 1024: raise HTTPException(400, "Image must be 15 MB or smaller")
     image = cv2.imdecode(np.frombuffer(raw_bytes, np.uint8), cv2.IMREAD_COLOR)
@@ -137,7 +192,7 @@ async def scan_image(file: UploadFile = File(...), location: str = Form("Unknown
     if not (ok and ok2 and ok3): raise HTTPException(500, "Unable to encode processed images")
     urls = [save_image(value.tobytes(), scan_id, kind) for value, kind in ((original_bytes, "original"), (annotated_bytes, "annotated"), (mask_bytes, "mask"))]
     detection_data, summary = [d.to_dict() for d in detections], summarize(detections)
-    row = db.Scan(id=scan_id, filename=file.filename, location=location[:255] or "Unknown", depth_m=max(depth_m, 0), original_url=urls[0], annotated_url=urls[1], mask_url=urls[2], detections_json=json.dumps(detection_data), summary_json=json.dumps(summary), owner_id=user.id)
+    row = db.Scan(id=scan_id, filename=file.filename, location=location[:255] or "Unknown", depth_m=max(depth_m, 0), latitude=latitude, longitude=longitude, original_url=urls[0], annotated_url=urls[1], mask_url=urls[2], detections_json=json.dumps(detection_data), summary_json=json.dumps(summary), owner_id=user.id)
     session.add(row); session.commit(); session.refresh(row)
     return scan_view(row, detail=True)
 
@@ -234,6 +289,52 @@ def stats(session: Session = Depends(db.get_db), user: db.User = Depends(auth.cu
         for key, value in summary.get("severity_counts", {}).items(): severity[key] = severity.get(key, 0) + value
         timeline.append({"timestamp": row.created_at.timestamp(), "scan_id": row.id, "debris_count": summary.get("debris_count", 0), "total_objects": summary.get("total_objects", 0)})
     return {"total_scans": len(rows), "total_objects_detected": sum(x["total_objects"] for x in timeline), "total_debris_detected": sum(x["debris_count"] for x in timeline), "label_counts": labels, "severity_counts": severity, "timeline": sorted(timeline, key=lambda x: x["timestamp"])}
+
+def _worst_severity(summary):
+    counts = summary.get("severity_counts", {}) or {}
+    for level in ("high", "medium", "low"):
+        if counts.get(level, 0): return level
+    return "low"
+
+@app.get("/api/map/points")
+def map_points(session: Session = Depends(db.get_db), user: db.User = Depends(auth.current_user)):
+    """Every geotagged scan as a map pin: position, severity, debris counts."""
+    query = select(db.Scan).where(db.Scan.latitude.is_not(None), db.Scan.longitude.is_not(None)).order_by(db.Scan.created_at.desc())
+    if user.role != "admin": query = query.where(db.Scan.owner_id == user.id)
+    points = []
+    for row in session.scalars(query):
+        summary = json.loads(row.summary_json)
+        points.append({
+            "scan_id": row.id, "lat": row.latitude, "lng": row.longitude,
+            "location": row.location, "depth_m": row.depth_m, "timestamp": row.created_at.timestamp(),
+            "filename": row.filename, "thumbnail_url": row.annotated_url,
+            "total_objects": summary.get("total_objects", 0), "debris_count": summary.get("debris_count", 0),
+            "by_label": summary.get("by_label", {}), "severity": _worst_severity(summary),
+        })
+    return {"points": points}
+
+@app.get("/api/map/sectors")
+def map_sectors(cell_deg: float = 2.0, session: Session = Depends(db.get_db), user: db.User = Depends(auth.current_user)):
+    """Aggregate geotagged scans into a survey-coverage grid (for the coverage layer)."""
+    cell = min(max(cell_deg, 0.25), 20.0)
+    query = select(db.Scan).where(db.Scan.latitude.is_not(None), db.Scan.longitude.is_not(None))
+    if user.role != "admin": query = query.where(db.Scan.owner_id == user.id)
+    cells = {}
+    for row in session.scalars(query):
+        key = (int(row.latitude // cell), int(row.longitude // cell))
+        cell_data = cells.setdefault(key, {"scan_count": 0, "debris_count": 0, "lat_sum": 0.0, "lng_sum": 0.0, "high": 0})
+        summary = json.loads(row.summary_json)
+        cell_data["scan_count"] += 1
+        cell_data["debris_count"] += summary.get("debris_count", 0)
+        cell_data["lat_sum"] += row.latitude
+        cell_data["lng_sum"] += row.longitude
+        if _worst_severity(summary) == "high": cell_data["high"] += 1
+    sectors = [{
+        "bounds": [[key[0] * cell, key[1] * cell], [(key[0] + 1) * cell, (key[1] + 1) * cell]],
+        "center": [round(v["lat_sum"] / v["scan_count"], 4), round(v["lng_sum"] / v["scan_count"], 4)],
+        "scan_count": v["scan_count"], "debris_count": v["debris_count"], "hotspot": v["high"] > 0 or v["debris_count"] >= 5,
+    } for key, v in cells.items()]
+    return {"cell_deg": cell, "sectors": sectors}
 
 @app.get("/api/admin/users")
 def admin_users(session: Session = Depends(db.get_db), _: db.User = Depends(auth.admin_user)):
