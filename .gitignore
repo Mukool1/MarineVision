@@ -1,6 +1,7 @@
 # Secrets and local environment configuration
 .env
 .env.*
+*.sql
 !.env.example
 backend/.env
 frontend/.env
